@@ -1,0 +1,56 @@
+{
+  "channels": {
+    "email": {
+      "host": "smtp.example.com",
+      "port": 587,
+      "secure": false,
+      "auth": {
+        "user": "${SMTP_USER}",
+        "pass": "${SMTP_PASS}"
+      },
+      "from": "${SMTP_USER}"
+    },
+    "slack": {
+      "webhook": "${SLACK_WEBHOOK}"
+    },
+    "gmail": {
+      "email": "your-email@gmail.com",
+      "clientId": "YOUR_GOOGLE_CLIENT_ID",
+      "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+      "refreshToken": "${GOOGLE_REFRESH_TOKEN}"
+    }
+  },
+  "checks": [
+    {
+      "name": "Check raymond data",
+      "url": "https://raymond.hostlink.com.hk/json/data.json",
+      "method": "GET",
+      "condition": {
+        "field": "data",
+        "operator": "length_gt",
+        "value": 0
+      },
+      "notify": {
+        "channels": ["email", "slack"],
+        "to": ["mathsgod@yahoo.com"],
+        "subject": "Data Alert - raymond.hostlink.com.hk",
+        "body": "Data at raymond.hostlink.com.hk/json/data.json has content greater than 0."
+      }
+    },
+    {
+      "name": "Check HKTV price",
+      "command": "hktv price get H0888001_S_P10014683 -j",
+      "condition": {
+        "field": "data[-1].price",
+        "operator": "gt",
+        "value": 100
+      },
+      "notify": {
+        "channels": ["email"],
+        "to": ["mathsgod@yahoo.com"],
+        "subject": "HKTV Price Alert",
+        "body": "Price is greater than 100."
+      }
+    }
+  ]
+}
