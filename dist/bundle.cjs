@@ -29516,7 +29516,59 @@ var require_run = __commonJS({
 // src/checks.js
 var require_checks = __commonJS({
   "src/checks.js"(exports2, module2) {
+    var axios = require_axios();
+    var { execSync } = require("child_process");
     var { loadConfig } = require_config();
+    function getNestedValue(obj, path) {
+      if (!path) return obj;
+      return path.split(".").reduce((acc, part) => {
+        if (acc == null) return void 0;
+        const match = part.match(/^(\w+)\[(-?\d+)\]$/);
+        if (match) {
+          const arr = acc[match[1]];
+          if (Array.isArray(arr)) {
+            const idx = parseInt(match[2]);
+            return idx < 0 ? arr[arr.length + idx] : arr[idx];
+          }
+          return void 0;
+        }
+        return acc[part];
+      }, obj);
+    }
+    function evaluateCondition(data, condition) {
+      if (!condition) return { met: true, value: data };
+      let value = getNestedValue(data, condition.field);
+      let met;
+      switch (condition.operator) {
+        case "length_gt":
+          met = Array.isArray(value) && value.length > condition.value;
+          break;
+        case "gt":
+          met = Number(value) > Number(condition.value);
+          break;
+        case "lt":
+          met = Number(value) < Number(condition.value);
+          break;
+        case "eq":
+          met = value === condition.value;
+          break;
+        case "neq":
+          met = value !== condition.value;
+          break;
+        case "contains":
+          met = typeof value === "string" && value.includes(condition.value);
+          break;
+        case "truthy":
+          met = !!value;
+          break;
+        case "falsy":
+          met = !value;
+          break;
+        default:
+          met = false;
+      }
+      return { met, value };
+    }
     function register(program2) {
       const checksCmd2 = program2.command("checks").description("Manage checks");
       checksCmd2.command("list").description("List all configured checks").option("-c, --config <path>", "path to config file", "notify.json").action((options) => {
@@ -29547,6 +29599,78 @@ var require_checks = __commonJS({
           }
           console.log("");
         });
+      });
+      checksCmd2.command("inspect").description("Run a check and show its return value (no notifications sent)").option("-c, --config <path>", "path to config file", "notify.json").option("-n, --name <name>", "check name to inspect (default: first check)").option("-i, --index <number>", "check index to inspect (1-based)").action(async (options) => {
+        const config = loadConfig(options.config);
+        if (!config.checks || !Array.isArray(config.checks) || config.checks.length === 0) {
+          console.log("No checks defined.");
+          return;
+        }
+        let check;
+        if (options.index) {
+          const idx = parseInt(options.index) - 1;
+          check = config.checks[idx];
+          if (!check) {
+            console.error(`Check index ${options.index} not found. Available: 1-${config.checks.length}`);
+            process.exit(1);
+          }
+        } else if (options.name) {
+          check = config.checks.find((c) => c.name === options.name);
+          if (!check) {
+            console.error(`Check "${options.name}" not found.`);
+            console.log("Available checks:", config.checks.map((c) => c.name || "(unnamed)").join(", "));
+            process.exit(1);
+          }
+        } else {
+          check = config.checks[0];
+        }
+        const label = check.name || check.url || check.command;
+        const source = check.url || check.command;
+        console.log(`Inspecting: ${label}`);
+        console.log(`Source:     ${source}
+`);
+        if (!source) {
+          console.error('Missing "url" or "command" in check.');
+          process.exit(1);
+        }
+        let data;
+        try {
+          if (check.url) {
+            const response = await axios({
+              method: check.method || "GET",
+              url: check.url,
+              timeout: 3e4,
+              headers: check.headers || {}
+            });
+            data = response.data;
+          } else {
+            const stdout = execSync(check.command, {
+              timeout: 6e4,
+              encoding: "utf-8",
+              shell: "/bin/bash"
+            }).trim();
+            try {
+              data = JSON.parse(stdout);
+            } catch {
+              data = stdout;
+            }
+          }
+        } catch (err) {
+          console.error(`ERROR: ${err.message}`);
+          process.exit(1);
+        }
+        console.log("Return value:");
+        console.log(JSON.stringify(data, null, 2));
+        if (check.condition) {
+          const { met, value } = evaluateCondition(data, check.condition);
+          const c = check.condition;
+          console.log(`
+Condition:  ${c.field || ""} ${c.operator || "truthy"} ${c.value !== void 0 ? c.value : ""}`);
+          console.log(`Field value: ${JSON.stringify(value)}`);
+          console.log(`Result:     ${met ? "TRUE (would notify)" : "FALSE (no notification)"}`);
+        } else {
+          console.log("\nNo condition defined. Would always notify.");
+        }
       });
     }
     module2.exports = { register };
