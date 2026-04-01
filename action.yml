@@ -1,0 +1,8 @@
+name: 'Notify'
+description: 'Monitor endpoints and send notifications based on conditions'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run notify
+      shell: bash
+      run: node "${{ github.action_path }}/dist/bundle.cjs" run
