@@ -3,6 +3,7 @@
 const { Command } = require('commander');
 const runCmd = require('./src/run');
 const checksCmd = require('./src/checks');
+const channelsCmd = require('./src/channels');
 
 const program = new Command();
 
@@ -13,5 +14,6 @@ program
 
 runCmd.register(program);
 checksCmd.register(program);
+channelsCmd.register(program);
 
 program.parse();
