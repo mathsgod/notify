@@ -5,6 +5,23 @@ const emailChannel = require('./channels/email');
 const slackChannel = require('./channels/slack');
 const gmailChannel = require('./channels/gmail');
 
+function parseCommandOutput(stdout) {
+  try {
+    return JSON.parse(stdout);
+  } catch {}
+  const start = stdout.search(/[{[]/);
+  if (start === -1) return stdout;
+  const open = stdout[start];
+  const close = open === '{' ? '}' : ']';
+  const end = stdout.lastIndexOf(close);
+  if (end > start) {
+    try {
+      return JSON.parse(stdout.slice(start, end + 1));
+    } catch {}
+  }
+  return stdout;
+}
+
 function register(program) {
   program
     .command('run')
@@ -60,11 +77,7 @@ async function runCheck(check, config) {
         encoding: 'utf-8',
         shell: '/bin/bash'
       }).trim();
-      try {
-        data = JSON.parse(stdout);
-      } catch {
-        data = stdout;
-      }
+      data = parseCommandOutput(stdout);
     }
   } catch (err) {
     console.log(`ERROR: ${err.message}`);

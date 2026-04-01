@@ -29370,6 +29370,24 @@ var require_run = __commonJS({
     var emailChannel = require_email();
     var slackChannel = require_slack();
     var gmailChannel = require_gmail();
+    function parseCommandOutput(stdout) {
+      try {
+        return JSON.parse(stdout);
+      } catch {
+      }
+      const start = stdout.search(/[{[]/);
+      if (start === -1) return stdout;
+      const open = stdout[start];
+      const close = open === "{" ? "}" : "]";
+      const end = stdout.lastIndexOf(close);
+      if (end > start) {
+        try {
+          return JSON.parse(stdout.slice(start, end + 1));
+        } catch {
+        }
+      }
+      return stdout;
+    }
     function register(program2) {
       program2.command("run").description("Run all checks defined in notify.json").option("-c, --config <path>", "path to config file", "notify.json").action(async (options) => {
         const config = loadConfig(options.config);
@@ -29413,11 +29431,7 @@ var require_run = __commonJS({
             encoding: "utf-8",
             shell: "/bin/bash"
           }).trim();
-          try {
-            data = JSON.parse(stdout);
-          } catch {
-            data = stdout;
-          }
+          data = parseCommandOutput(stdout);
         }
       } catch (err) {
         console.log(`ERROR: ${err.message}`);
@@ -29519,6 +29533,24 @@ var require_checks = __commonJS({
     var axios = require_axios();
     var { execSync } = require("child_process");
     var { loadConfig } = require_config();
+    function parseCommandOutput(stdout) {
+      try {
+        return JSON.parse(stdout);
+      } catch {
+      }
+      const start = stdout.search(/[{[]/);
+      if (start === -1) return stdout;
+      const open = stdout[start];
+      const close = open === "{" ? "}" : "]";
+      const end = stdout.lastIndexOf(close);
+      if (end > start) {
+        try {
+          return JSON.parse(stdout.slice(start, end + 1));
+        } catch {
+        }
+      }
+      return stdout;
+    }
     function getNestedValue(obj, path) {
       if (!path) return obj;
       return path.split(".").reduce((acc, part) => {
@@ -29649,11 +29681,7 @@ var require_checks = __commonJS({
               encoding: "utf-8",
               shell: "/bin/bash"
             }).trim();
-            try {
-              data = JSON.parse(stdout);
-            } catch {
-              data = stdout;
-            }
+            data = parseCommandOutput(stdout);
           }
         } catch (err) {
           console.error(`ERROR: ${err.message}`);
